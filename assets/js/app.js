@@ -95,10 +95,24 @@ async function loadFromGoogleSheets(){
     map:value(r,'Map','Map Link','Google Maps'),site:value(r,'Site','Website','Hotel Site','Booking Link')
   })).filter(r=>r.city&&r.name);
 
-  const mappedFood=food.map(r=>({
-    name:value(r,'Name','Food','Dish'),city:value(r,'City'),image:value(r,'Image','Photo','Image File'),
-    tag:value(r,'Tag','Category','Priority'),detail:value(r,'Detail','Details','Notes','Must Order')
-  })).filter(r=>r.name);
+  // Food sheets are often edited manually, so make this section forgiving:
+  // - ignore an accidental repeated header row (e.g. Name / City / Image)
+  // - restore the bundled image and copy when optional cells are blank
+  // - accept either a local filename or a complete image URL
+  const demoFoodByName=Object.fromEntries(DEMO.food.map(item=>[cleanKey(item.name),item]));
+  const mappedFood=food.map(r=>{
+    const name=value(r,'Name','Food','Dish');
+    const fallback=demoFoodByName[cleanKey(name)]||{};
+    const rawImage=value(r,'Image','Photo','Image File','Image URL');
+    const cleanOptional=v=>{const t=String(v||'').trim();return (!t||t==='.'||t==='-'||/^n\/?a$/i.test(t))?'':t};
+    return {
+      name,
+      city:cleanOptional(value(r,'City'))||fallback.city||'',
+      image:cleanOptional(rawImage)||fallback.image||'',
+      tag:cleanOptional(value(r,'Tag','Category','Priority'))||fallback.tag||'',
+      detail:cleanOptional(value(r,'Detail','Details','Notes','Must Order'))||fallback.detail||''
+    };
+  }).filter(r=>r.name && cleanKey(r.name)!=='name' && cleanKey(r.name)!=='food' && cleanKey(r.name)!=='dish');
 
   const mappedAttractions=attractions.map(r=>({
     name:value(r,'Name','Attraction','Place'),city:value(r,'City'),image:value(r,'Image','Photo','Image File'),
@@ -134,7 +148,7 @@ function render(){
  $("routeGrid").innerHTML=DATA.route.map((r,i)=>`<article class="route-card"><img src="images/${r.image}" alt="${esc(r.city)}"><div class="route-copy"><small>STOP ${i+1} · ${r.dates}</small><h3>${esc(r.city)}</h3><strong>${r.nights} night${r.nights===1?"":"s"}</strong><span>${esc(r.summary)}</span></div></article>`).join("");
  $("dayGrid").innerHTML=DATA.days.map(d=>`<article class="day-card"><div class="day-media"><img src="images/${d.image}" alt="${esc(d.title)}"><div class="day-title"><small>DAY ${d.day} · ${esc(d.date)} · ${esc(d.city)}</small><h3>${esc(d.title)}</h3><span>${esc(d.weather)}</span></div></div><div class="day-summary">${d.activities.map(a=>`<div class="activity"><time>${esc(a[0])}</time><strong>${esc(a[1])}</strong></div>`).join("")}</div><details class="day-extra"><summary>View day details</summary><p>Open the connected Google Sheet to update timing, notes and booking status.</p></details></article>`).join("");
  const byCity={};DATA.hotels.forEach(h=>(byCity[h.city]||=[]).push(h));$("hotelCities").innerHTML=Object.entries(byCity).map(([city,hotels],i)=>`<section class="hotel-city ${i===0?"open":""}"><div class="hotel-city-head" onclick="this.parentElement.classList.toggle('open')"><h3>${esc(city)}</h3><span>${hotels.length} recommendations · tap to open</span></div><div class="hotel-city-body"><div class="hotel-row">${hotels.map(h=>`<article class="hotel-card"><img src="images/${h.image}" alt="${esc(h.name)}" onerror="this.src='images/hotel-generic-pending.jpg'"><div class="hotel-body"><span class="tag">${h.rating}</span><h4>${esc(h.name)}</h4><div class="meta">${esc(h.area)}</div>${h.price?`<div class="price">${h.price}</div>`:`<div class="meta" style="margin-top:8px">Price to check</div>`}<p class="why">${esc(h.why)}</p><details><summary>View details</summary><p><strong>${esc(h.pros)}</strong></p><div class="buttons"><a target="_blank" href="${h.map}">Map</a><a class="alt" target="_blank" href="${h.site}">Hotel site</a></div></details></div></article>`).join("")}</div></div></section>`).join("");
- $("foodGrid").innerHTML=DATA.food.map(x=>`<article class="visual-card"><img src="images/${x.image}" alt="${esc(x.name)}"><div class="visual-body"><h3>${esc(x.name)}</h3><p>${esc(x.city)} · ${esc(x.tag)}</p><strong>${esc(x.detail)}</strong></div></article>`).join("");
+ $("foodGrid").innerHTML=DATA.food.map(x=>{const src=/^https?:\/\//i.test(x.image)?x.image:`images/${x.image}`;return `<article class="visual-card"><img src="${esc(src)}" alt="${esc(x.name)}" onerror="this.onerror=null;this.src='images/food-takoyaki.jpg'"><div class="visual-body"><h3>${esc(x.name)}</h3><p>${esc(x.city)}${x.city&&x.tag?' · ':''}${esc(x.tag)}</p><strong>${esc(x.detail)}</strong></div></article>`}).join("");
  $("attractionGrid").innerHTML=DATA.attractions.map(x=>`<article class="visual-card"><img src="images/${x.image}" alt="${esc(x.name)}"><div class="visual-body"><h3>${esc(x.name)}</h3><p>${esc(x.city)} · ${esc(x.duration)}</p><strong>${esc(x.tip)}</strong></div></article>`).join("");
 }
 
