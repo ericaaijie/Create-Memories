@@ -72,7 +72,15 @@ async function loadFromGoogleSheets(){
     const day=value(a,'Day','Day Number','DayNo');
     const time=value(a,'Time','Timing');
     const activity=value(a,'Activity','Activities','Plan','Description');
-    if(day && activity) (activityByDay[String(num(day))]||=[]).push([time,activity]);
+    if(day && activity) (activityByDay[String(num(day))]||=[]).push({
+      time,
+      activity,
+      details:value(a,'Details','Detail','Notes','Description'),
+      location:value(a,'Location','Place','Area'),
+      duration:value(a,'Duration','Time Needed'),
+      type:value(a,'Type','Category'),
+      map:value(a,'Map Link','Map','Google Maps','URL')
+    });
   });
 
   const mappedRoute=route.map(r=>({
@@ -143,43 +151,47 @@ async function loadFromGoogleSheets(){
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));
 function countdown(start){const now=new Date(),s=new Date(start+"T00:00:00");const box=$("countdownBox");if(now>=s){box.style.display="none";return}$("countdown").textContent=Math.ceil((s-now)/86400000)+" days"}
-function formatTripDates(startDate,endDate){
-  const start=new Date(startDate+"T00:00:00"),end=new Date(endDate+"T00:00:00");
-  if(Number.isNaN(start.getTime())||Number.isNaN(end.getTime())) return "";
-  const month=d=>d.toLocaleString("en-GB",{month:"short"});
-  return start.getMonth()===end.getMonth()&&start.getFullYear()===end.getFullYear()
-    ? `${start.getDate()}–${end.getDate()} ${month(end)} ${end.getFullYear()}`
-    : `${start.getDate()} ${month(start)} ${start.getFullYear()} – ${end.getDate()} ${month(end)} ${end.getFullYear()}`;
-}
-function tripDuration(startDate,endDate){
-  const start=new Date(startDate+"T00:00:00"),end=new Date(endDate+"T00:00:00");
-  if(Number.isNaN(start.getTime())||Number.isNaN(end.getTime())) return "";
-  const days=Math.round((end-start)/86400000)+1;
-  return `${days}D${Math.max(days-1,0)}N`;
-}
 function render(){
- const c=DATA.config;
- $("tripName").textContent=c.tripName;
- $("tripStyle").textContent=c.style;
- $("brandName").textContent=c.tripName;
- $("brandSubtitle").textContent=c.style||"Travel Journal";
- $("heroEyebrow").textContent=`🌸 ${String(c.tripName||"Japan 2027").toUpperCase()}`;
- $("siteFooter").textContent=`🌸 ${c.tripName}`;
- document.title=c.tripName;
- const description=`${c.tripName}${c.style?` — ${c.style}`:""}.`;
- const meta=$("metaDescription"); if(meta) meta.setAttribute("content",description);
- $("dates").textContent=formatTripDates(c.startDate,c.endDate);
- $("travellers").textContent=c.travellers+" travellers";
- $("cities").textContent=c.cities;
- $("budget").textContent="RM"+c.budget.toLocaleString();
- $("duration").textContent=tripDuration(c.startDate,c.endDate);
- countdown(c.startDate);
+ const c=DATA.config;$("tripName").textContent=c.tripName;$("tripStyle").textContent=c.style;$("dates").textContent="10–21 Mar 2027";$("travellers").textContent=c.travellers+" travellers";$("cities").textContent=c.cities;$("budget").textContent="RM"+c.budget.toLocaleString();$("duration").textContent="12D11N";countdown(c.startDate);
  $("routeGrid").innerHTML=DATA.route.map((r,i)=>`<article class="route-card"><img src="images/${r.image}" alt="${esc(r.city)}"><div class="route-copy"><small>STOP ${i+1} · ${r.dates}</small><h3>${esc(r.city)}</h3><strong>${r.nights} night${r.nights===1?"":"s"}</strong><span>${esc(r.summary)}</span></div></article>`).join("");
- $("dayGrid").innerHTML=DATA.days.map(d=>`<article class="day-card"><div class="day-media"><img src="images/${d.image}" alt="${esc(d.title)}"><div class="day-title"><small>DAY ${d.day} · ${esc(d.date)} · ${esc(d.city)}</small><h3>${esc(d.title)}</h3><span>${esc(d.weather)}</span></div></div><div class="day-summary">${d.activities.map(a=>`<div class="activity"><time>${esc(a[0])}</time><strong>${esc(a[1])}</strong></div>`).join("")}</div><details class="day-extra"><summary>View day details</summary><p>Open the connected Google Sheet to update timing, notes and booking status.</p></details></article>`).join("");
+ const normaliseActivity=a=>Array.isArray(a)?{time:a[0]||'',activity:a[1]||'',details:'',location:'',duration:'',type:'',map:''}:{time:a.time||'',activity:a.activity||a.plan||'',details:a.details||'',location:a.location||'',duration:a.duration||'',type:a.type||'',map:a.map||''};
+ $("dayGrid").innerHTML=DATA.days.map(d=>{
+   const acts=(d.activities||[]).map(normaliseActivity);
+   const preview=acts.slice(0,3);
+   return `<article class="day-card"><div class="day-media"><img src="images/${d.image}" alt="${esc(d.title)}"><div class="day-title"><small>DAY ${d.day} · ${esc(d.date)} · ${esc(d.city)}</small><h3>${esc(d.title)}</h3><span>${esc(d.weather)}</span></div></div><div class="day-summary">${preview.map(a=>`<div class="activity"><time>${esc(a.time)}</time><strong>${esc(a.activity)}</strong></div>`).join("")}</div><button class="open-day" type="button" data-day="${d.day}">Open hourly itinerary <span>→</span></button></article>`;
+ }).join("");
+ document.querySelectorAll('.open-day').forEach(btn=>btn.addEventListener('click',()=>openDay(Number(btn.dataset.day))));
  const byCity={};DATA.hotels.forEach(h=>(byCity[h.city]||=[]).push(h));$("hotelCities").innerHTML=Object.entries(byCity).map(([city,hotels],i)=>`<section class="hotel-city ${i===0?"open":""}"><div class="hotel-city-head" onclick="this.parentElement.classList.toggle('open')"><h3>${esc(city)}</h3><span>${hotels.length} recommendations · tap to open</span></div><div class="hotel-city-body"><div class="hotel-row">${hotels.map(h=>`<article class="hotel-card"><img src="images/${h.image}" alt="${esc(h.name)}" onerror="this.src='images/hotel-generic-pending.jpg'"><div class="hotel-body"><span class="tag">${h.rating}</span><h4>${esc(h.name)}</h4><div class="meta">${esc(h.area)}</div>${h.price?`<div class="price">${h.price}</div>`:`<div class="meta" style="margin-top:8px">Price to check</div>`}<p class="why">${esc(h.why)}</p><details><summary>View details</summary><p><strong>${esc(h.pros)}</strong></p><div class="buttons"><a target="_blank" href="${h.map}">Map</a><a class="alt" target="_blank" href="${h.site}">Hotel site</a></div></details></div></article>`).join("")}</div></div></section>`).join("");
  $("foodGrid").innerHTML=DATA.food.map(x=>{const src=/^https?:\/\//i.test(x.image)?x.image:`images/${x.image}`;return `<article class="visual-card"><img src="${esc(src)}" alt="${esc(x.name)}" onerror="this.onerror=null;this.src='images/food-takoyaki.jpg'"><div class="visual-body"><h3>${esc(x.name)}</h3><p>${esc(x.city)}${x.city&&x.tag?' · ':''}${esc(x.tag)}</p><strong>${esc(x.detail)}</strong></div></article>`}).join("");
  $("attractionGrid").innerHTML=DATA.attractions.map(x=>`<article class="visual-card"><img src="images/${x.image}" alt="${esc(x.name)}"><div class="visual-body"><h3>${esc(x.name)}</h3><p>${esc(x.city)} · ${esc(x.duration)}</p><strong>${esc(x.tip)}</strong></div></article>`).join("");
 }
+
+function iconForType(type,activity){
+ const t=(type+' '+activity).toLowerCase();
+ if(/flight|airport|plane/.test(t)) return '✈';
+ if(/train|rail|bus|transport|transfer/.test(t)) return '🚆';
+ if(/food|lunch|dinner|breakfast|cafe|restaurant/.test(t)) return '🍴';
+ if(/hotel|check-in|check in|rest/.test(t)) return '🛏';
+ if(/photo|view|sight|temple|shrine|museum|attraction/.test(t)) return '📷';
+ if(/shop|market/.test(t)) return '🛍';
+ return '📍';
+}
+function openDay(dayNumber){
+ const d=DATA.days.find(x=>Number(x.day)===Number(dayNumber));
+ if(!d) return;
+ const normaliseActivity=a=>Array.isArray(a)?{time:a[0]||'',activity:a[1]||'',details:'',location:'',duration:'',type:'',map:''}:{time:a.time||'',activity:a.activity||a.plan||'',details:a.details||'',location:a.location||'',duration:a.duration||'',type:a.type||'',map:a.map||''};
+ const acts=(d.activities||[]).map(normaliseActivity);
+ const rows=acts.length?acts.map(a=>`<div class="day-detail-row"><div class="detail-time">${esc(a.time||'TBC')}</div><div class="detail-plan"><span class="detail-icon">${iconForType(a.type,a.activity)}</span><div><strong>${esc(a.activity)}</strong>${a.duration?`<small>${esc(a.duration)}</small>`:''}</div></div><div class="detail-notes">${a.details?esc(a.details):'<span class="muted">Add details in Activities sheet</span>'}</div><div class="detail-location">${a.location?`<strong>${esc(a.location)}</strong>`:'<span class="muted">Location TBC</span>'}${a.map?`<a href="${esc(a.map)}" target="_blank" rel="noopener">Open map ↗</a>`:''}</div></div>`).join(''):`<div class="empty-day">No hourly activities yet. Add rows to the Activities tab using this day number.</div>`;
+ let modal=document.getElementById('dayModal');
+ if(!modal){modal=document.createElement('div');modal.id='dayModal';modal.className='day-modal';document.body.appendChild(modal)}
+ modal.innerHTML=`<div class="day-modal-backdrop" data-close></div><section class="day-modal-panel" role="dialog" aria-modal="true" aria-label="Day ${d.day} itinerary"><header class="day-modal-head"><button class="day-back" data-close>← Back to itinerary</button><button class="day-close" data-close aria-label="Close">×</button><div><small>DAY ${d.day} · ${esc(d.date)} · ${esc(d.city)}</small><h2>${esc(d.title)}</h2><p>${esc(d.weather)}</p></div></header><div class="day-tabs"><button class="active">Hourly itinerary</button><button disabled>Attractions</button><button disabled>Food</button><button disabled>Notes</button></div><div class="day-detail-table"><div class="day-detail-labels"><span>Time</span><span>Plan</span><span>Details</span><span>Location</span></div>${rows}</div><footer class="day-modal-nav"><button ${d.day<=1?'disabled':''} data-prev>← Previous day</button><span>Day ${d.day} of ${DATA.days.length}</span><button ${d.day>=DATA.days.length?'disabled':''} data-next>Next day →</button></footer></section>`;
+ modal.classList.add('show');document.body.classList.add('modal-open');
+ modal.querySelectorAll('[data-close]').forEach(el=>el.addEventListener('click',closeDay));
+ const prev=modal.querySelector('[data-prev]');if(prev)prev.addEventListener('click',()=>openDay(d.day-1));
+ const next=modal.querySelector('[data-next]');if(next)next.addEventListener('click',()=>openDay(d.day+1));
+}
+function closeDay(){const modal=document.getElementById('dayModal');if(modal)modal.classList.remove('show');document.body.classList.remove('modal-open')}
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeDay()});
 
 (async()=>{
   try{
