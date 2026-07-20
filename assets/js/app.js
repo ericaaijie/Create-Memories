@@ -79,7 +79,15 @@ async function loadFromGoogleSheets(){
       location:value(a,'Location','Place','Area'),
       duration:value(a,'Duration','Time Needed'),
       type:value(a,'Type','Category'),
-      map:value(a,'Map Link','Map','Google Maps','URL')
+      category:value(a,'Category','Type'),
+      emoji:value(a,'Emoji','Icon'),
+      subtitle:value(a,'Subtitle','Story','Tagline'),
+      map:value(a,'Map Link','Map','Google Maps','URL'),
+      priority:value(a,'Priority'),
+      booking:value(a,'Booking Status','Booking','Status'),
+      cost:value(a,'Cost','Price','Estimated Cost'),
+      notes:value(a,'Notes','Tips','Tip'),
+      mood:value(a,'Mood')
     });
   });
 
@@ -154,7 +162,6 @@ function countdown(start){const now=new Date(),s=new Date(start+"T00:00:00");con
 function render(){
  const c=DATA.config;$("tripName").textContent=c.tripName;$("tripStyle").textContent=c.style;$("dates").textContent="10–21 Mar 2027";$("travellers").textContent=c.travellers+" travellers";$("cities").textContent=c.cities;$("budget").textContent="RM"+c.budget.toLocaleString();$("duration").textContent="12D11N";countdown(c.startDate);
  $("routeGrid").innerHTML=DATA.route.map((r,i)=>`<article class="route-card"><img src="images/${r.image}" alt="${esc(r.city)}"><div class="route-copy"><small>STOP ${i+1} · ${r.dates}</small><h3>${esc(r.city)}</h3><strong>${r.nights} night${r.nights===1?"":"s"}</strong><span>${esc(r.summary)}</span></div></article>`).join("");
- const normaliseActivity=a=>Array.isArray(a)?{time:a[0]||'',activity:a[1]||'',details:'',location:'',duration:'',type:'',map:''}:{time:a.time||'',activity:a.activity||a.plan||'',details:a.details||'',location:a.location||'',duration:a.duration||'',type:a.type||'',map:a.map||''};
  $("dayGrid").innerHTML=DATA.days.map(d=>{
    const acts=(d.activities||[]).map(normaliseActivity);
    const preview=acts.slice(0,3);
@@ -166,25 +173,81 @@ function render(){
  $("attractionGrid").innerHTML=DATA.attractions.map(x=>`<article class="visual-card"><img src="images/${x.image}" alt="${esc(x.name)}"><div class="visual-body"><h3>${esc(x.name)}</h3><p>${esc(x.city)} · ${esc(x.duration)}</p><strong>${esc(x.tip)}</strong></div></article>`).join("");
 }
 
-function iconForType(type,activity){
+function iconForType(type,activity,customEmoji){
+ if(customEmoji) return customEmoji;
  const t=(type+' '+activity).toLowerCase();
- if(/flight|airport|plane/.test(t)) return '✈';
- if(/train|rail|bus|transport|transfer/.test(t)) return '🚆';
- if(/food|lunch|dinner|breakfast|cafe|restaurant/.test(t)) return '🍴';
- if(/hotel|check-in|check in|rest/.test(t)) return '🛏';
- if(/photo|view|sight|temple|shrine|museum|attraction/.test(t)) return '📷';
- if(/shop|market/.test(t)) return '🛍';
+ if(/arrival|land|airport arrival/.test(t)) return '🛬';
+ if(/departure|fly home/.test(t)) return '🛫';
+ if(/flight|airport|plane/.test(t)) return '✈️';
+ if(/shinkansen|bullet train/.test(t)) return '🚄';
+ if(/subway|metro/.test(t)) return '🚇';
+ if(/ropeway|cable car/.test(t)) return '🚠';
+ if(/cruise|boat|ship|ferry/.test(t)) return '🚢';
+ if(/bus/.test(t)) return '🚌';
+ if(/taxi|cab/.test(t)) return '🚖';
+ if(/train|rail|transport|transfer/.test(t)) return '🚆';
+ if(/ryokan|onsen|hot spring|relax/.test(t)) return '♨️';
+ if(/hotel|check-in|check in|luggage|rest/.test(t)) return '🏨';
+ if(/breakfast/.test(t)) return '🥞';
+ if(/cafe|coffee/.test(t)) return '☕';
+ if(/matcha|tea/.test(t)) return '🍵';
+ if(/hida beef|wagyu|beef/.test(t)) return '🥩';
+ if(/ramen|noodle|udon|soba/.test(t)) return '🍜';
+ if(/sushi/.test(t)) return '🍣';
+ if(/takoyaki/.test(t)) return '🐙';
+ if(/food|lunch|dinner|restaurant|market/.test(t)) return '🍴';
+ if(/shrine|torii|fushimi/.test(t)) return '⛩️';
+ if(/temple|castle|historic/.test(t)) return '🏯';
+ if(/bamboo|arashiyama/.test(t)) return '🎋';
+ if(/fuji|mountain/.test(t)) return '🗻';
+ if(/lake|river|waterfall/.test(t)) return '🌊';
+ if(/museum|gallery|art/.test(t)) return '🎨';
+ if(/universal|theme park|ride|nintendo|harry potter/.test(t)) return '🎢';
+ if(/shop|shopping|mall|don quijote/.test(t)) return '🛍️';
+ if(/photo|view|scenic|sight|attraction/.test(t)) return '📸';
+ if(/walk|stroll/.test(t)) return '🚶';
  return '📍';
+}
+function categoryFor(a){
+ const t=((a.category||a.type||'')+' '+(a.activity||'')).toLowerCase();
+ if(/flight|airport/.test(t)) return 'flight';
+ if(/train|bus|transport|transfer|shinkansen|subway|ropeway|cruise|taxi/.test(t)) return 'transport';
+ if(/food|lunch|dinner|breakfast|cafe|restaurant|market|beef|sushi|ramen/.test(t)) return 'food';
+ if(/hotel|ryokan|onsen|rest|check-in|check in/.test(t)) return 'stay';
+ if(/shop/.test(t)) return 'shopping';
+ if(/nature|lake|mountain|bamboo|park|scenic/.test(t)) return 'nature';
+ if(/relax/.test(t)) return 'relax';
+ return 'attraction';
+}
+function priorityBadge(v){
+ const x=String(v||'').trim(); if(!x) return '';
+ const low=x.toLowerCase();
+ const icon=/must/.test(low)?'❤️':/high/.test(low)?'⭐':/optional/.test(low)?'💤':'📍';
+ return `<span class="detail-badge priority">${icon} ${esc(x)}</span>`;
+}
+function bookingBadge(v){
+ const x=String(v||'').trim(); if(!x) return '';
+ const low=x.toLowerCase();
+ const icon=/confirm|booked|purchased|reserved/.test(low)?'✅':/soon|to book|reserve|buy|confirm/.test(low)?'🟡':/not booked/.test(low)?'🔴':'📋';
+ return `<span class="detail-badge booking">${icon} ${esc(x)}</span>`;
+}
+function normaliseActivity(a){
+ return Array.isArray(a)?{time:a[0]||'',activity:a[1]||'',details:'',location:'',duration:'',type:'',category:'',emoji:'',subtitle:'',map:'',priority:'',booking:'',cost:'',notes:'',mood:''}:{
+  time:a.time||'',activity:a.activity||a.plan||'',details:a.details||'',location:a.location||'',duration:a.duration||'',type:a.type||'',category:a.category||'',emoji:a.emoji||'',subtitle:a.subtitle||'',map:a.map||'',priority:a.priority||'',booking:a.booking||'',cost:a.cost||'',notes:a.notes||'',mood:a.mood||''
+ };
 }
 function openDay(dayNumber){
  const d=DATA.days.find(x=>Number(x.day)===Number(dayNumber));
  if(!d) return;
- const normaliseActivity=a=>Array.isArray(a)?{time:a[0]||'',activity:a[1]||'',details:'',location:'',duration:'',type:'',map:''}:{time:a.time||'',activity:a.activity||a.plan||'',details:a.details||'',location:a.location||'',duration:a.duration||'',type:a.type||'',map:a.map||''};
  const acts=(d.activities||[]).map(normaliseActivity);
- const rows=acts.length?acts.map(a=>`<div class="day-detail-row"><div class="detail-time">${esc(a.time||'TBC')}</div><div class="detail-plan"><span class="detail-icon">${iconForType(a.type,a.activity)}</span><div><strong>${esc(a.activity)}</strong>${a.duration?`<small>${esc(a.duration)}</small>`:''}</div></div><div class="detail-notes">${a.details?esc(a.details):'<span class="muted">Add details in Activities sheet</span>'}</div><div class="detail-location">${a.location?`<strong>${esc(a.location)}</strong>`:'<span class="muted">Location TBC</span>'}${a.map?`<a href="${esc(a.map)}" target="_blank" rel="noopener">Open map ↗</a>`:''}</div></div>`).join(''):`<div class="empty-day">No hourly activities yet. Add rows to the Activities tab using this day number.</div>`;
+ const rows=acts.length?acts.map((a,index)=>{
+  const badges=[priorityBadge(a.priority),bookingBadge(a.booking),a.cost?`<span class="detail-badge cost">💴 ${esc(a.cost)}</span>`:'',a.mood?`<span class="detail-badge mood">${esc(a.mood)}</span>`:''].filter(Boolean).join('');
+  const extra=a.notes?`<div class="detail-tip">💡 ${esc(a.notes)}</div>`:'';
+  return `<article class="timeline-item category-${categoryFor(a)}"><div class="timeline-time">${esc(a.time||'TBC')}</div><div class="timeline-rail"><span class="timeline-dot">${iconForType(a.type,a.activity,a.emoji)}</span>${index<acts.length-1?'<span class="timeline-line"></span>':''}</div><div class="timeline-card"><div class="timeline-card-head"><div><small>${esc(a.subtitle||a.category||a.type||'Planned stop')}</small><h3>${esc(a.activity)}</h3></div>${a.duration?`<span class="duration-chip">⏱ ${esc(a.duration)}</span>`:''}</div>${a.details?`<p class="timeline-description">${esc(a.details)}</p>`:''}<div class="timeline-meta">${a.location?`<span>📍 ${esc(a.location)}</span>`:''}${a.map?`<a href="${esc(a.map)}" target="_blank" rel="noopener">Open in Google Maps ↗</a>`:''}</div>${badges?`<div class="detail-badges">${badges}</div>`:''}${extra}</div></article>`;
+ }).join(''):`<div class="empty-day">No hourly activities yet. Add rows to the Activities tab using this day number.</div>`;
  let modal=document.getElementById('dayModal');
  if(!modal){modal=document.createElement('div');modal.id='dayModal';modal.className='day-modal';document.body.appendChild(modal)}
- modal.innerHTML=`<div class="day-modal-backdrop" data-close></div><section class="day-modal-panel" role="dialog" aria-modal="true" aria-label="Day ${d.day} itinerary"><header class="day-modal-head"><button class="day-back" data-close>← Back to itinerary</button><button class="day-close" data-close aria-label="Close">×</button><div><small>DAY ${d.day} · ${esc(d.date)} · ${esc(d.city)}</small><h2>${esc(d.title)}</h2><p>${esc(d.weather)}</p></div></header><div class="day-tabs"><button class="active">Hourly itinerary</button><button disabled>Attractions</button><button disabled>Food</button><button disabled>Notes</button></div><div class="day-detail-table"><div class="day-detail-labels"><span>Time</span><span>Plan</span><span>Details</span><span>Location</span></div>${rows}</div><footer class="day-modal-nav"><button ${d.day<=1?'disabled':''} data-prev>← Previous day</button><span>Day ${d.day} of ${DATA.days.length}</span><button ${d.day>=DATA.days.length?'disabled':''} data-next>Next day →</button></footer></section>`;
+ modal.innerHTML=`<div class="day-modal-backdrop" data-close></div><section class="day-modal-panel" role="dialog" aria-modal="true" aria-label="Day ${d.day} itinerary"><header class="day-modal-head day-hero-head"><button class="day-back" data-close>← Back to itinerary</button><button class="day-close" data-close aria-label="Close">×</button><div class="day-kicker">DAY ${d.day} · ${esc(d.date)} · ${esc(d.city)}</div><h2>${esc(d.title)}</h2><div class="day-head-meta"><span>🌡 ${esc(d.weather||'Weather TBC')}</span><span>🗓 ${acts.length} planned stops</span></div></header><div class="day-tabs"><button class="active">Hourly itinerary</button><button disabled>Attractions</button><button disabled>Food</button><button disabled>Notes</button></div><div class="timeline-list">${rows}</div><footer class="day-modal-nav"><button ${d.day<=1?'disabled':''} data-prev>← Previous day</button><span>Day ${d.day} of ${DATA.days.length}</span><button ${d.day>=DATA.days.length?'disabled':''} data-next>Next day →</button></footer></section>`;
  modal.classList.add('show');document.body.classList.add('modal-open');
  modal.querySelectorAll('[data-close]').forEach(el=>el.addEventListener('click',closeDay));
  const prev=modal.querySelector('[data-prev]');if(prev)prev.addEventListener('click',()=>openDay(d.day-1));
