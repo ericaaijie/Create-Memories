@@ -143,8 +143,37 @@ async function loadFromGoogleSheets(){
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));
 function countdown(start){const now=new Date(),s=new Date(start+"T00:00:00");const box=$("countdownBox");if(now>=s){box.style.display="none";return}$("countdown").textContent=Math.ceil((s-now)/86400000)+" days"}
+function formatTripDates(startDate,endDate){
+  const start=new Date(startDate+"T00:00:00"),end=new Date(endDate+"T00:00:00");
+  if(Number.isNaN(start.getTime())||Number.isNaN(end.getTime())) return "";
+  const month=d=>d.toLocaleString("en-GB",{month:"short"});
+  return start.getMonth()===end.getMonth()&&start.getFullYear()===end.getFullYear()
+    ? `${start.getDate()}–${end.getDate()} ${month(end)} ${end.getFullYear()}`
+    : `${start.getDate()} ${month(start)} ${start.getFullYear()} – ${end.getDate()} ${month(end)} ${end.getFullYear()}`;
+}
+function tripDuration(startDate,endDate){
+  const start=new Date(startDate+"T00:00:00"),end=new Date(endDate+"T00:00:00");
+  if(Number.isNaN(start.getTime())||Number.isNaN(end.getTime())) return "";
+  const days=Math.round((end-start)/86400000)+1;
+  return `${days}D${Math.max(days-1,0)}N`;
+}
 function render(){
- const c=DATA.config;$("tripName").textContent=c.tripName;$("tripStyle").textContent=c.style;$("dates").textContent="10–21 Mar 2027";$("travellers").textContent=c.travellers+" travellers";$("cities").textContent=c.cities;$("budget").textContent="RM"+c.budget.toLocaleString();$("duration").textContent="12D11N";countdown(c.startDate);
+ const c=DATA.config;
+ $("tripName").textContent=c.tripName;
+ $("tripStyle").textContent=c.style;
+ $("brandName").textContent=c.tripName;
+ $("brandSubtitle").textContent=c.style||"Travel Journal";
+ $("heroEyebrow").textContent=`🌸 ${String(c.tripName||"Japan 2027").toUpperCase()}`;
+ $("siteFooter").textContent=`🌸 ${c.tripName}`;
+ document.title=c.tripName;
+ const description=`${c.tripName}${c.style?` — ${c.style}`:""}.`;
+ const meta=$("metaDescription"); if(meta) meta.setAttribute("content",description);
+ $("dates").textContent=formatTripDates(c.startDate,c.endDate);
+ $("travellers").textContent=c.travellers+" travellers";
+ $("cities").textContent=c.cities;
+ $("budget").textContent="RM"+c.budget.toLocaleString();
+ $("duration").textContent=tripDuration(c.startDate,c.endDate);
+ countdown(c.startDate);
  $("routeGrid").innerHTML=DATA.route.map((r,i)=>`<article class="route-card"><img src="images/${r.image}" alt="${esc(r.city)}"><div class="route-copy"><small>STOP ${i+1} · ${r.dates}</small><h3>${esc(r.city)}</h3><strong>${r.nights} night${r.nights===1?"":"s"}</strong><span>${esc(r.summary)}</span></div></article>`).join("");
  $("dayGrid").innerHTML=DATA.days.map(d=>`<article class="day-card"><div class="day-media"><img src="images/${d.image}" alt="${esc(d.title)}"><div class="day-title"><small>DAY ${d.day} · ${esc(d.date)} · ${esc(d.city)}</small><h3>${esc(d.title)}</h3><span>${esc(d.weather)}</span></div></div><div class="day-summary">${d.activities.map(a=>`<div class="activity"><time>${esc(a[0])}</time><strong>${esc(a[1])}</strong></div>`).join("")}</div><details class="day-extra"><summary>View day details</summary><p>Open the connected Google Sheet to update timing, notes and booking status.</p></details></article>`).join("");
  const byCity={};DATA.hotels.forEach(h=>(byCity[h.city]||=[]).push(h));$("hotelCities").innerHTML=Object.entries(byCity).map(([city,hotels],i)=>`<section class="hotel-city ${i===0?"open":""}"><div class="hotel-city-head" onclick="this.parentElement.classList.toggle('open')"><h3>${esc(city)}</h3><span>${hotels.length} recommendations · tap to open</span></div><div class="hotel-city-body"><div class="hotel-row">${hotels.map(h=>`<article class="hotel-card"><img src="images/${h.image}" alt="${esc(h.name)}" onerror="this.src='images/hotel-generic-pending.jpg'"><div class="hotel-body"><span class="tag">${h.rating}</span><h4>${esc(h.name)}</h4><div class="meta">${esc(h.area)}</div>${h.price?`<div class="price">${h.price}</div>`:`<div class="meta" style="margin-top:8px">Price to check</div>`}<p class="why">${esc(h.why)}</p><details><summary>View details</summary><p><strong>${esc(h.pros)}</strong></p><div class="buttons"><a target="_blank" href="${h.map}">Map</a><a class="alt" target="_blank" href="${h.site}">Hotel site</a></div></details></div></article>`).join("")}</div></div></section>`).join("");
